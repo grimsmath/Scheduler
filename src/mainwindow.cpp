@@ -24,7 +24,7 @@ MainWindow::MainWindow(ConfigLoader* config, QWidget *parent) :
 {
     ui->setupUi(this);
 
-    m_appTranslator->load(":/i18n/QCalendar_zh_CN");
+    m_appTranslator->load(":/i18n/Scheduler_zh_CN");
     m_qtTranslator->load(":/i18n/qt_zh_CN");
 
     switch (config->pref()->language) {
@@ -56,6 +56,8 @@ MainWindow::MainWindow(ConfigLoader* config, QWidget *parent) :
     ui->calendarWidget->setAcceptDrops(false);
     m_tableView->setAcceptDrops(false);
     setAcceptDrops(false);
+
+    showMaximized();
 }
 
 MainWindow::~MainWindow()
@@ -213,3 +215,38 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
         setPinWindow(false);
     }
 }
+
+void MainWindow::printCalendar(QPrinter *printer)
+{
+
+}
+
+void MainWindow::on_btnQuit_clicked()
+{
+    close();
+}
+
+
+void MainWindow::on_btnPrint_clicked()
+{
+    QPrinterInfo    def = QPrinterInfo::defaultPrinter();
+    QPrinter        printer(def, QPrinter::ScreenResolution);
+    QPainter        painter(&printer);
+
+    double xscale   = printer.pageRect().width() / double(ui->calendarWidget->width());
+    double yscale   = printer.pageRect().height() / double(ui->calendarWidget->height());
+    double scale    = qMin(xscale, yscale);
+    painter.scale(scale, scale);
+
+    double xtrans   = printer.paperRect().x() + printer.pageRect().width()/2;
+    double ytrans   = printer.paperRect().y() + printer.pageRect().height()/2;
+    painter.translate(xtrans, ytrans);
+
+    ui->calendarWidget->render(&painter);
+
+    QPrintPreviewDialog dlg(&printer, this);
+    if (dlg.exec() != QDialog::Accepted) {
+        return;
+    }
+}
+

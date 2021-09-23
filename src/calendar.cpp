@@ -3,24 +3,9 @@
 #include "filedetaildialog.h"
 #include "eventlistdialog.h"
 #include "color.h"
-#include <QLocale>
-#include <QFontMetrics>
-#include <QDateTime>
-#include <QTimer>
-#include <QStandardItemModel>
-#include <QCryptographicHash>
-#include <QByteArray>
-#include <QDateTime>
-#include <QMimeData>
-#include <QUrl>
-#include <QFileInfo>
-#include <QMessageBox>
-#include <QStandardPaths>
-#include <QDir>
 
 const int Calendar::FONTSIZE_DAYOFMONTH;
 const int Calendar::FONTSIZE_ITEMTITLE;
-constexpr char const Calendar::COLOR_TODAY[];
 const int Calendar::MARGIN_BELOW_DAY;
 const int Calendar::MARGIN_BETWEEN_TILES;
 const int Calendar::MARGIN_TILE_SIDE;
@@ -30,6 +15,12 @@ const int Calendar::PADDING_LEFT;
 const int Calendar::PADDING_RIGHT;
 const int Calendar::FREEZE_PERIOD;
 
+constexpr char const Calendar::COLOR_TODAY[];
+
+/**
+ * @brief Calendar::Calendar
+ * @param parent
+ */
 Calendar::Calendar(QWidget* parent):
     QCalendarWidget(parent)
 {
@@ -37,25 +28,35 @@ Calendar::Calendar(QWidget* parent):
     setGridVisible(true);
     setStyleSheet("selection-background-color: white");
     setNavigationBarVisible(false);
+
     connect(this, SIGNAL(currentPageChanged(int,int)), this, SLOT(loadMonthLists()));
     connect(this, SIGNAL(currentPageChanged(int,int)), this, SLOT(freezeDoubleClick()));
 }
 
+/**
+ * @brief Calendar::paintCell
+ * @param painter
+ * @param rect
+ * @param date
+ */
 void Calendar::paintCell(QPainter * painter, const QRect & rect, const QDate & date) const
 {
     if (xPivots.isEmpty() || rect.x() > xPivots.last()) {
         xPivots.append(rect.x());
         cellWidths.append(rect.width());
     }
+
     if (yPivots.isEmpty() || rect.y() > yPivots.last()) {
         yPivots.append(rect.y());
         cellHeights.append(rect.height());
     }
+
     if (date == QDateTime::currentDateTime().date()) {
         painter->setPen(Qt::NoPen);
         painter->setBrush(QColor(COLOR_TODAY));
         painter->drawRect(rect);
     }
+
     if (date.month() != monthShown()) {
         painter->setPen(Qt::lightGray);
     } else if (date.dayOfWeek() == Qt::Saturday || date.dayOfWeek() == Qt::Sunday) {
@@ -63,23 +64,29 @@ void Calendar::paintCell(QPainter * painter, const QRect & rect, const QDate & d
     } else {
         painter->setPen(Qt::black);
     }
+
     painter->setFont(QFont("Sans", FONTSIZE_DAYOFMONTH));
     painter->drawText(rect, Qt::AlignTop | Qt::AlignRight, QString::number(date.day()));
     QFont itemTitleFont = QFont("Sans", FONTSIZE_ITEMTITLE);
     QFontMetrics itemTitleMetrics(itemTitleFont);
     painter->setFont(itemTitleFont);
+
     if (date.month() != monthShown()) {
         return;
     }
+
     auto dayFileList = m_monthFileList[date.day()];
     auto dayEventList = m_monthEventList[date.day()];
     auto dayList = dayFileList + dayEventList;
+
     if (!dayList.isEmpty()) {
         int maxLine = (rect.height() - FONTSIZE_DAYOFMONTH - MARGIN_BELOW_DAY) /
                 (PADDING_TOP + FONTSIZE_ITEMTITLE + PADDING_BOTTOM + MARGIN_BETWEEN_TILES);
+
         painter->save();
         painter->translate(rect.x(), rect.y());
         painter->translate(MARGIN_TILE_SIDE, FONTSIZE_DAYOFMONTH + MARGIN_BELOW_DAY);
+
         for (int i = 0; i < dayList.size(); ++i) {
             if (i == maxLine - 1 && i < dayList.size() - 1) {
                 painter->setPen(Qt::gray);
@@ -87,9 +94,11 @@ void Calendar::paintCell(QPainter * painter, const QRect & rect, const QDate & d
                                   tr("%1 More").arg(dayList.size() - i));
                 break;
             }
+
             QString sha1 = dayList[i];
-            int color;
             QString title;
+            int color;
+
             if (i < dayFileList.size()) {
                 const CalendarFile* file = m_dataAdapter->getFile(sha1);
                 color = file->color;
@@ -97,8 +106,13 @@ void Calendar::paintCell(QPainter * painter, const QRect & rect, const QDate & d
             } else {
                 const CalendarEvent* event = m_dataAdapter->getEvent(sha1);
                 color = event->color;
-                title = event->title;
+                title = QString("%1-%2: %3 %4")
+                        .arg(event->startTime.toString("hh:mm ap"))
+                        .arg(event->endTime.toString("hh:mm ap"))
+                        .arg(event->title)
+                        .arg(event->location.length() > 0 ? "(" + event->location + ")" : "");
             }
+
             painter->setPen(Qt::NoPen);
             painter->setBrush(Color::getColor(color));
             painter->drawRect(0, 0, rect.width() - 2 * MARGIN_TILE_SIDE,
@@ -106,21 +120,31 @@ void Calendar::paintCell(QPainter * painter, const QRect & rect, const QDate & d
             painter->save();
             painter->translate(PADDING_LEFT, PADDING_TOP + FONTSIZE_ITEMTITLE);
             painter->setPen(Qt::black);
-            QString elidedTitle = itemTitleMetrics.elidedText(title, Qt::ElideRight,
+
+            QString elidedTitle = itemTitleMetrics.elidedText(title,
+                                                              Qt::ElideRight,
                                                               rect.width() - PADDING_LEFT - PADDING_RIGHT - 2 * MARGIN_TILE_SIDE);
             painter->drawText(0, 0, elidedTitle);
             painter->restore();
             painter->translate(0, PADDING_TOP + FONTSIZE_ITEMTITLE + PADDING_BOTTOM + MARGIN_BETWEEN_TILES);
         }
+
         painter->restore();
     }
 }
 
+/**
+ * @brief Calendar::startOfWeekChanged
+ * @param day
+ */
 void Calendar::startOfWeekChanged(Qt::DayOfWeek day)
 {
     setFirstDayOfWeek(day);
 }
 
+/**
+ * @brief Calendar::loadMonthLists
+ */
 void Calendar::loadMonthLists()
 {
     m_monthEventList = m_dataAdapter->getEventsForMonth(yearShown(), monthShown());
@@ -128,6 +152,10 @@ void Calendar::loadMonthLists()
     update();
 }
 
+/**
+ * @brief Calendar::setDataAdapter
+ * @param dataAdapter
+ */
 void Calendar::setDataAdapter(DataAdapter *dataAdapter)
 {
     m_dataAdapter = dataAdapter;
@@ -135,12 +163,20 @@ void Calendar::setDataAdapter(DataAdapter *dataAdapter)
     loadMonthLists();
 }
 
+/**
+ * @brief Calendar::freezeDoubleClick
+ */
 void Calendar::freezeDoubleClick()
 {
     doubleClickFreezed = true;
     QTimer::singleShot(FREEZE_PERIOD, [this]{ doubleClickFreezed = false; });
 }
 
+/**
+ * @brief Calendar::doubleClicked
+ * @param x
+ * @param y
+ */
 void Calendar::doubleClicked(int x, int y)
 {
     // dirty hack: exclude header and cells from adjacent months
@@ -148,6 +184,7 @@ void Calendar::doubleClicked(int x, int y)
         return;
     }
     int xInCell, yInCell, cellWidth = 0, cellHeight = 0;
+
     for (int i = xPivots.size() - 1; i >= 0; --i) {
         xInCell = x - xPivots[i];
         if (xInCell >= 0) {
@@ -155,6 +192,7 @@ void Calendar::doubleClicked(int x, int y)
             break;
         }
     }
+
     for (int i = yPivots.size() - 1; i >= 0; --i) {
         yInCell = y - yPivots[i];
         if (yInCell >= 0) {
@@ -162,12 +200,14 @@ void Calendar::doubleClicked(int x, int y)
             break;
         }
     }
+
     int index = getTileIndex(xInCell, yInCell, cellWidth, cellHeight);
     int maxLine = (cellHeight - FONTSIZE_DAYOFMONTH - MARGIN_BELOW_DAY) /
         (PADDING_TOP + FONTSIZE_ITEMTITLE + PADDING_BOTTOM + MARGIN_BETWEEN_TILES);
     QStringList fileList = m_monthFileList[selectedDate().day()];
     QStringList eventList = m_monthEventList[selectedDate().day()];
     QStringList dayList = fileList + eventList;
+
     if (dayList.size() <= maxLine) {
         if (0 <= index && index < dayList.size()) {
             if (index < fileList.size()) {
@@ -190,12 +230,20 @@ void Calendar::doubleClicked(int x, int y)
     return showEventDialog(selectedDate());
 }
 
+/**
+ * @brief Calendar::showEventDialog
+ * @param sha1
+ */
 void Calendar::showEventDialog(const QString &sha1)
 {
     EventDialog dlg(*(m_dataAdapter->getEvent(sha1)));
     execEventDialog(dlg, sha1);
 }
 
+/**
+ * @brief Calendar::showFileDetailDialog
+ * @param itemSha1
+ */
 void Calendar::showFileDetailDialog(const QString &itemSha1)
 {
     const CalendarFile* file = m_dataAdapter->getFile(itemSha1);
@@ -209,6 +257,10 @@ void Calendar::showFileDetailDialog(const QString &itemSha1)
     }
 }
 
+/**
+ * @brief Calendar::showEventDialog
+ * @param date
+ */
 void Calendar::showEventDialog(const QDate& date)
 {
     EventDialog dlg(date);
@@ -216,6 +268,11 @@ void Calendar::showEventDialog(const QDate& date)
     execEventDialog(dlg);
 }
 
+/**
+ * @brief Calendar::execEventDialog
+ * @param dlg
+ * @param sha1
+ */
 void Calendar::execEventDialog(EventDialog &dlg, QString sha1)
 {
     if (sha1.isEmpty()) {
@@ -223,6 +280,7 @@ void Calendar::execEventDialog(EventDialog &dlg, QString sha1)
                            (dlg.title() + QString::number(QDateTime::currentMSecsSinceEpoch())).toUtf8(),
                            QCryptographicHash::Sha1).toHex());
     }
+
     if (dlg.exec() == QDialog::Accepted) {
         switch(dlg.deleteStatus) {
         case EventDialog::DO_NOT_DELETE:
@@ -245,6 +303,11 @@ void Calendar::execEventDialog(EventDialog &dlg, QString sha1)
     }
 }
 
+/**
+ * @brief Calendar::showItemList
+ * @param sha1List
+ * @param numFiles
+ */
 void Calendar::showItemList(const QStringList &sha1List, int numFiles)
 {
     QStandardItemModel model(sha1List.size(), 1);
@@ -274,6 +337,9 @@ void Calendar::showItemList(const QStringList &sha1List, int numFiles)
     }
 }
 
+/**
+ * @brief Calendar::cellsResized
+ */
 void Calendar::cellsResized()
 {
     xPivots.clear();
@@ -282,21 +348,36 @@ void Calendar::cellsResized()
     cellHeights.clear();
 }
 
+/**
+ * @brief Calendar::getTileIndex
+ * @param x
+ * @param y
+ * @param cellWidth
+ * @param cellHeight
+ * @return
+ */
 int Calendar::getTileIndex(int x, int y, int cellWidth, int cellHeight)
 {
     if (x <= MARGIN_TILE_SIDE || x >= cellWidth - MARGIN_TILE_SIDE) {
         return -1;
     }
+
     int baseY = FONTSIZE_DAYOFMONTH + MARGIN_BELOW_DAY;
     int dy = PADDING_TOP + FONTSIZE_ITEMTITLE + PADDING_BOTTOM + MARGIN_BETWEEN_TILES;
+
     for (int i = 0; baseY + dy <= cellHeight; ++i, baseY += dy) {
         if (baseY < y && y < baseY + dy) {
             return i;
         }
     }
+
     return -1;
 }
 
+/**
+ * @brief Calendar::drop
+ * @param e
+ */
 void Calendar::drop(QDropEvent *e)
 {
     QDate date = getDateByPosition(e->pos());
@@ -340,6 +421,12 @@ void Calendar::drop(QDropEvent *e)
     setFocus();
 }
 
+/**
+ * @brief Calendar::importFile
+ * @param srcPath
+ * @param sha1
+ * @return
+ */
 bool Calendar::importFile(const QString &srcPath, const QString &sha1)
 {
     QString filesPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + QDir::separator() + "files";
@@ -356,6 +443,11 @@ bool Calendar::importFile(const QString &srcPath, const QString &sha1)
     return QFile::copy(srcPath, dstPath);
 }
 
+/**
+ * @brief Calendar::getDateByPosition
+ * @param pos
+ * @return
+ */
 QDate Calendar::getDateByPosition(const QPoint &pos)
 {
     int xIndex = -1, yIndex = -1;

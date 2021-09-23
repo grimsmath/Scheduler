@@ -6,6 +6,7 @@
 #include <QLocale>
 #include <QKeyEvent>
 #include <QTableView>
+
 #include "configloader.h"
 
 namespace Ui {
@@ -27,6 +28,9 @@ private slots:
     void setPinWindow(bool);
     void toggleDrop(bool);
 
+    void on_btnQuit_clicked();
+    void on_btnPrint_clicked();
+
 signals:
     void doubleClick(int x, int y);
     void resizeCells();
@@ -40,13 +44,12 @@ public:
 private:
     Ui::MainWindow *ui;
     QTableView* m_tableView;
-
     QTranslator* m_appTranslator;
     QTranslator* m_qtTranslator;
-
     ConfigLoader* m_config;
 
     static QString getLongMonthName(int);
+    void printCalendar(QPrinter *printer);
 };
 
 #endif // MAINWINDOW_H

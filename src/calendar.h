@@ -37,17 +37,19 @@ protected:
     void paintCell(QPainter * painter, const QRect & rect, const QDate & date) const;
 
 private:
-    static const int FONTSIZE_DAYOFMONTH = 16;
-    static const int FONTSIZE_ITEMTITLE = 12;
-    static const int MARGIN_BELOW_DAY = 4;
-    static const int MARGIN_BETWEEN_TILES = 2;
-    static const int MARGIN_TILE_SIDE = 2;
-    static const int PADDING_TOP = 2;
-    static const int PADDING_BOTTOM = 2;
-    static const int PADDING_LEFT = 2;
-    static const int PADDING_RIGHT = 2;
+    static const int FONTSIZE_DAYOFMONTH    = 16;
+    static const int FONTSIZE_ITEMTITLE     = 12;
+    static const int MARGIN_BELOW_DAY       = 4;
+    static const int MARGIN_BETWEEN_TILES   = 2;
+    static const int MARGIN_TILE_SIDE       = 2;
+    static const int PADDING_TOP            = 6;
+    static const int PADDING_BOTTOM         = 6;
+    static const int PADDING_LEFT           = 2;
+    static const int PADDING_RIGHT          = 2;
+    static const int FREEZE_PERIOD          = 500;
+
     static constexpr char const COLOR_TODAY[] = "#FFF8DC";
-    static const int FREEZE_PERIOD = 500;
+
     bool doubleClickFreezed = false;
     mutable QList<int> xPivots, yPivots, cellWidths, cellHeights;    // record starting coordinates and metrics of all cells
 
